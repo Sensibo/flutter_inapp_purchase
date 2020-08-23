@@ -1,6 +1,10 @@
 package com.dooboolab.flutterinapppurchase;
 
 import androidx.annotation.Nullable;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
 
 import com.android.billingclient.api.AcknowledgePurchaseParams;
@@ -26,27 +30,42 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.embedding.engine.plugins.activity.ActivityAware;
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
+import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.FlutterException;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
+import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
 
 /** AndroidInappPurchasePlugin */
 public class AndroidInappPurchasePlugin implements MethodCallHandler {
-  public static Registrar reg;
+  private Activity mainActivity;
+  private Context applicationContext;
   static private ArrayList<SkuDetails> skus;
   private final String TAG = "InappPurchasePlugin";
   private BillingClient billingClient;
-  private static MethodChannel channel;
+  private MethodChannel channel;
 
-  /** Plugin registration. */
   public static void registerWith(Registrar registrar) {
-    channel = new MethodChannel(registrar.messenger(), "flutter_inapp");
-    channel.setMethodCallHandler(new FlutterInappPurchasePlugin());
-    reg = registrar;
+    AndroidInappPurchasePlugin plugin = new AndroidInappPurchasePlugin();
+    plugin.setActivity(registrar.activity());
+    plugin.onAttachedToEngine(registrar.context(), registrar.messenger());
     skus = new ArrayList<>();
+  }
+
+  private void setActivity(Activity flutterActivity) {
+    this.mainActivity = flutterActivity;
+  }
+
+  private void onAttachedToEngine(Context context, BinaryMessenger binaryMessenger) {
+    this.applicationContext = context;
+    this.channel = new MethodChannel(binaryMessenger, "flutter_inapp");
+    this.channel.setMethodCallHandler(this);
   }
 
   @Override
@@ -68,7 +87,7 @@ public class AndroidInappPurchasePlugin implements MethodCallHandler {
         return;
       }
 
-      billingClient = BillingClient.newBuilder(reg.context()).setListener(purchasesUpdatedListener)
+      billingClient = BillingClient.newBuilder(this.applicationContext).setListener(purchasesUpdatedListener)
           .enablePendingPurchases()
           .build();
       billingClient.startConnection(new BillingClientStateListener() {
@@ -391,7 +410,7 @@ public class AndroidInappPurchasePlugin implements MethodCallHandler {
 
       builder.setSkuDetails(selectedSku);
       BillingFlowParams flowParams = builder.build();
-      billingClient.launchBillingFlow(reg.activity(), flowParams);
+      billingClient.launchBillingFlow(this.mainActivity, flowParams);
     }
 
     /*
